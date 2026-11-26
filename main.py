@@ -17,9 +17,9 @@ RAW_LIST_FILE = DATA_DIR / "domains_raw.lst"
 VALID_DOMAINS_FILE = DATA_DIR / "resolved_domains.txt"
 
 # Параметры DNS-проверки
-DNS_SERVERS = ["1.1.1.1", "8.8.8.8", "9.9.9.9"]
-CONCURRENCY_LIMIT = 500  # Количество одновременных DNS-запросов
-DNS_TIMEOUT = 3.0        # Таймаут на один запрос в секундах
+DNS_SERVERS = ["1.1.1.1"]
+CONCURRENCY_LIMIT = 1500  # Количество одновременных DNS-запросов
+DNS_TIMEOUT = 1.2        # Таймаут на один запрос в секундах
 
 logging.basicConfig(
     level=logging.INFO,
@@ -90,26 +90,20 @@ async def fetch_if_changed(session: aiohttp.ClientSession, state: dict) -> Optio
 async def check_domain(
     domain: str, resolver: aiodns.DNSResolver, semaphore: asyncio.Semaphore
 ) -> Optional[str]:
-    """Проверяет, резолвится ли домен (A или AAAA запись)."""
+    """Проверяет, есть ли у домена A-запись (IPv4)."""
     async with semaphore:
         try:
-            # Проверяем A-запись (IPv4)
             await resolver.query(domain, "A")
             return domain
         except aiodns.error.DNSError:
-            try:
-                # Если нет IPv4, проверяем AAAA (IPv6)
-                await resolver.query(domain, "AAAA")
-                return domain
-            except aiodns.error.DNSError:
-                return None
+            return None
         except Exception:
             return None
 
 
 async def resolve_all(domains: list[str]) -> list[str]:
     """Асинхронно проверяет список доменов."""
-    resolver = aiodns.DNSResolver(nameservers=DNS_SERVERS, timeout=DNS_TIMEOUT)
+    resolver = aiodns.DNSResolver(nameservers=DNS_SERVERS, timeout=DNS_TIMEOUT, tries=1)
     semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
     tasks = [check_domain(domain, resolver, semaphore) for domain in domains]
