@@ -132,7 +132,9 @@ async def main():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     state = load_state()
 
-    async with aiohttp.ClientSession() as session:
+    resolver = aiohttp.ThreadedResolver()
+    connector = aiohttp.TCPConnector(resolver=resolver)
+    async with aiohttp.ClientSession(connector=connector) as session:
         content = await fetch_if_changed(session, state)
 
     if content is None:
